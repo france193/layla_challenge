@@ -139,68 +139,109 @@ function getNextCell(
 }
 
 function solve(grid: number[], columns: number[], rows: number[]): number[][] {
-  // this is the size (rows = columns, grid is n x n)
+  // retrieve size: is the lenght of rows or columns (grid is n*n)
   const n = rows.length;
-  // array of possible solutions
-  let solutions: number[][] = [];
+  const size = n * n;
 
-  // Convert the grid into a 2D grid (n x n)
-  let GT: number[][] = [];
-  for (let i = 0; i < n; i++) {
-    GT.push([...grid.slice(i * n, (i + 1) * n)]);
+  // empty array for solution
+  const solutions: number[][] = [];
+
+  // check the current grid configuration if is valid
+  function isValidPartialGrid(
+    partialGrid: number[],
+    row: number,
+    col: number
+  ): boolean {
+    // Check the row count
+    const rowStart = row * n;
+    const rowCount = partialGrid
+      .slice(rowStart, rowStart + n)
+      .filter((x) => x === 1).length;
+
+    // not valid, stop
+    if (rowCount > rows[row]) return false;
+
+    // Check the column count
+    const colCount = partialGrid
+      .filter((_, idx) => idx % n === col)
+      .filter((x) => x === 1).length;
+
+    // not valid, stop
+    if (colCount > columns[col]) return false;
+
+    // valid
+    return true;
   }
 
-  // Backtrack function
-  function backtrack(row: number, col: number): boolean {
-    if (row === n) {
-      // Check column constraints (all the sum of black cell should be columns[c])
-      for (let c = 0; c < n; c++) {
-        let colSum = 0;
-        for (let r = 0; r < n; r++) {
-          colSum += GT[r][c];
-        }
-        if (colSum !== columns[c]) {
-          return false;
-        }
+  // check if a fully filled grid is valid
+  function isSolution(partialGrid: number[]): boolean {
+    for (let i = 0; i < n; i++) {
+      const rowStart = i * n;
+      const rowCount = partialGrid
+        .slice(rowStart, rowStart + n)
+        .filter((x) => x === 1).length;
+
+      // not valid
+      if (rowCount !== rows[i]) return false;
+
+      const colCount = partialGrid
+        .filter((_, idx) => idx % n === i)
+        .filter((x) => x === 1).length;
+
+      if (colCount !== columns[i]) return false;
+    }
+
+    // valid
+    return true;
+  }
+
+  // fill the grid recursively ensuring constraints
+  function backtrack(pos: number, currentGrid: number[]): boolean {
+    if (pos === size) {
+      if (isSolution(currentGrid)) {
+        solutions.push([...currentGrid]);
       }
 
-      // If valid solution, push the flattened grid (1D array) to solutions array
-      solutions.push(GT.flat());
+      // Continue looking for more solutions
       return true;
     }
 
-    let { nextRow, nextCol } = getNextCell(row, col, n);
+    // determine row and column
+    const row = Math.floor(pos / n);
+    const col = pos % n;
+    const fixedValue = grid[pos];
 
-    // If the cell is fixed (1), move to the next cell
-    if (GT[row][col] !== 0) {
-      return backtrack(nextRow, nextCol);
+    // handle pre-filled cells
+    if (fixedValue !== 0) {
+      currentGrid[pos] = fixedValue;
+      if (isValidPartialGrid(currentGrid, row, col)) {
+        backtrack(pos + 1, currentGrid);
+      }
+      // Reset
+      currentGrid[pos] = 0;
+      return false;
     }
 
-    // Try both possible values (0 or 1) for the current cell
-    for (let value of [0, 1]) {
-      GT[row][col] = value;
-
-      // Check if the row constraint is satisfied
-      let rowSum = 0;
-      for (let cell of GT[row]) {
-        rowSum += cell;
-      }
-
-      if (rowSum <= rows[row]) {
-        if (backtrack(nextRow, nextCol)) {
-          return true;
-        }
-      }
+    // Try black cell: 1
+    currentGrid[pos] = 1;
+    if (isValidPartialGrid(currentGrid, row, col)) {
+      backtrack(pos + 1, currentGrid);
     }
 
-    // Backtrack if no valid solution found
-    GT[row][col] = 0;
+    // Try white cell: 0
+    currentGrid[pos] = 0;
+    if (isValidPartialGrid(currentGrid, row, col)) {
+      backtrack(pos + 1, currentGrid);
+    }
+
+    // reset
+    currentGrid[pos] = 0;
     return false;
   }
 
-  backtrack(0, 0);
-
-  console.log("I got those solutions: " + solutions.length);
+  console.log("Starting the solve process...");
+  backtrack(0, Array(size).fill(0));
+  console.log("Solve process completed.");
   return solutions;
 }
 
